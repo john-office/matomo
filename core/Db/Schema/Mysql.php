@@ -332,6 +332,8 @@ class Mysql implements SchemaInterface
                                             ts_started DATETIME NULL,
                                             status TINYINT(1) UNSIGNED DEFAULT 0,
                                             `report` VARCHAR(255) NULL,
+                                            processing_host VARCHAR(100) NULL DEFAULT NULL,
+                                            process_id VARCHAR(15) NULL DEFAULT NULL,
                                             PRIMARY KEY(idinvalidation),
                                             INDEX index_idsite_dates_period_name(idsite, date1, period)
                                         ) $tableOptions
@@ -669,6 +671,24 @@ class Mysql implements SchemaInterface
         return true;
     }
 
+    /**
+     * Returns the default collation for a charset.
+     *
+     * Will return an empty string for an unknown charset
+     * (can happen for alias charsets like "utf8").
+     *
+     * @param string $charset
+     *
+     * @return string
+     * @throws Exception
+     */
+    public function getDefaultCollationForCharset(string $charset): string
+    {
+        $result = $this->getDb()->fetchRow('SHOW CHARACTER SET WHERE `Charset` = ?', [$charset]);
+
+        return $result['Default collation'] ?? '';
+    }
+
     public function getDefaultPort(): int
     {
         return 3306;
@@ -678,9 +698,14 @@ class Mysql implements SchemaInterface
     {
         $engine = $this->getTableEngine();
         $charset = $this->getUsedCharset();
+        $collation = $this->getUsedCollation();
         $rowFormat = $this->getTableRowFormat();
 
         $options = "ENGINE=$engine DEFAULT CHARSET=$charset";
+
+        if ('' !== $collation) {
+            $options .= " COLLATE=$collation";
+        }
 
         if ('' !== $rowFormat) {
             $options .= " $rowFormat";
@@ -757,11 +782,23 @@ class Mysql implements SchemaInterface
         return true;
     }
 
+    public function getSupportedReadIsolationTransactionLevel(): string
+    {
+        return 'READ UNCOMMITTED';
+    }
+
     protected function getDatabaseCreateOptions(): string
     {
         $charset = DbHelper::getDefaultCharset();
+        $collation = $this->getDefaultCollationForCharset($charset);
 
-        return "DEFAULT CHARACTER SET $charset";
+        $options = "DEFAULT CHARACTER SET $charset";
+
+        if ('' !== $collation) {
+            $options .= " COLLATE $collation";
+        }
+
+        return $options;
     }
 
     protected function getTableEngine()
@@ -777,6 +814,11 @@ class Mysql implements SchemaInterface
     protected function getUsedCharset(): string
     {
         return $this->getDbSettings()->getUsedCharset();
+    }
+
+    protected function getUsedCollation(): string
+    {
+        return $this->getDbSettings()->getUsedCollation();
     }
 
     private function getTablePrefix()

@@ -13,7 +13,10 @@ use Piwik\ArchiveProcessor\Rules;
 use Piwik\CliMulti\RequestParser;
 use Piwik\Common;
 use Piwik\Config;
+use Piwik\Period\Day;
 use Piwik\Period\Factory;
+use Piwik\Period\Month;
+use Piwik\Period\Range;
 use Piwik\Plugins\CustomDimensions;
 use Piwik\Container\StaticContainer;
 use Piwik\CronArchive;
@@ -114,6 +117,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'report' => null,
                     'plugin' => null,
                     'segment' => '',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ],
             ],
             [
@@ -129,6 +134,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'report' => null,
                     'plugin' => null,
                     'segment' => '',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ],
             ],
             [],
@@ -257,6 +264,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => '',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
                 array (
                     'idarchive' => '1',
@@ -270,6 +279,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => '',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
                 array (
                     'idarchive' => '1',
@@ -283,6 +294,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => '',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
             ),
             array (
@@ -298,6 +311,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => 'browserCode==IE;dimension1==val',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
                 array (
                     'idarchive' => '1',
@@ -311,6 +326,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => 'browserCode==IE;dimension1==val',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
                 array (
                     'idarchive' => '1',
@@ -324,6 +341,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => '',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
             ),
             array (
@@ -339,6 +358,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => 'browserCode==IE;dimension1==val',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
                 array (
                     'idarchive' => '1',
@@ -352,6 +373,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => '',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
             ),
             array (
@@ -367,6 +390,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => 'browserCode==IE;dimension1==val',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
             ),
             array (
@@ -382,6 +407,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => '',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
             ),
             array (
@@ -397,6 +424,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => '',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
             ),
             array (
@@ -412,6 +441,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => 'browserCode==IE;dimension1==val',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
             ),
             array (
@@ -427,6 +458,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => '',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
             ),
             array (
@@ -442,6 +475,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => '',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
             ),
             array (
@@ -457,6 +492,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => 'browserCode==IE;dimension1==val',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
             ),
             array ( // end of idsite=1
@@ -474,6 +511,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'segment' => '',
                     'ts_started' => null,
                     'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ),
             ),
             array ( // end of idsite=2
@@ -565,7 +604,7 @@ class QueueConsumerTest extends IntegrationTestCase
 
         $expectedInvalidationsFound = [
             array(
-                ['idarchive' => '1', 'idsite' => '1', 'date1' => '2018-03-04', 'date2' => '2018-03-04', 'period' => '3', 'name' => 'done', 'report' => null, 'plugin' => null, 'segment' => '', 'ts_started' => null, 'status' => '0']
+                ['idarchive' => '1', 'idsite' => '1', 'date1' => '2018-03-04', 'date2' => '2018-03-04', 'period' => '3', 'name' => 'done', 'report' => null, 'plugin' => null, 'segment' => '', 'ts_started' => null, 'status' => '0', 'processing_host' => null, 'process_id' => null]
             ),
             array()
         ];
@@ -616,12 +655,15 @@ class QueueConsumerTest extends IntegrationTestCase
         $segmentHash2 = (new Segment('browserCode==FF', [1]))->getHash();
 
         $invalidations = [
-            ['idarchive' => 1, 'name' => 'done' . $segmentHash1, 'idsite' => 1, 'date1' => '2018-03-04', 'date2' => '2018-03-04', 'period' => 1, 'report' => null],
-            ['idarchive' => 1, 'name' => 'done' . $segmentHash2, 'idsite' => 1, 'date1' => '2018-03-04', 'date2' => '2018-03-04', 'period' => 1, 'report' => null],
-            ['idarchive' => 1, 'name' => 'done' . $segmentHash1, 'idsite' => 1, 'date1' => '2018-03-03', 'date2' => '2018-03-03', 'period' => 1, 'report' => null],
-            ['idarchive' => 1, 'name' => 'done' . $segmentHash2 . '.ExamplePlugin', 'idsite' => 1, 'date1' => '2018-03-04', 'date2' => '2018-03-04', 'period' => 1, 'report' => null],
-            ['idarchive' => 1, 'name' => 'done' . $segmentHash1, 'idsite' => 1, 'date1' => '2018-03-01', 'date2' => '2018-03-31', 'period' => 3, 'report' => null],
-            ['idarchive' => 1, 'name' => 'done', 'idsite' => 1, 'date1' => '2018-03-04', 'date2' => '2018-03-04', 'period' => 1, 'report' => null],
+            ['idarchive' => 1, 'name' => 'done' . $segmentHash1, 'idsite' => 1, 'date1' => '2018-03-04', 'date2' => '2018-03-04', 'period' => Day::PERIOD_ID, 'report' => null],
+            ['idarchive' => 2, 'name' => 'done' . $segmentHash2, 'idsite' => 1, 'date1' => '2018-03-04', 'date2' => '2018-03-04', 'period' => Day::PERIOD_ID, 'report' => null],
+            ['idarchive' => 3, 'name' => 'done' . $segmentHash1, 'idsite' => 1, 'date1' => '2018-03-03', 'date2' => '2018-03-03', 'period' => Day::PERIOD_ID, 'report' => null],
+            ['idarchive' => 4, 'name' => 'done' . $segmentHash2 . '.ExamplePlugin', 'idsite' => 1, 'date1' => '2018-03-04', 'date2' => '2018-03-04', 'period' => Day::PERIOD_ID, 'report' => null],
+            ['idarchive' => 5, 'name' => 'done' . $segmentHash1, 'idsite' => 1, 'date1' => '2018-03-01', 'date2' => '2018-03-31', 'period' => Month::PERIOD_ID, 'report' => null],
+            ['idarchive' => 6, 'name' => 'done' . $segmentHash1, 'idsite' => 1, 'date1' => '2018-03-04', 'date2' => '2018-03-31', 'period' => Range::PERIOD_ID, 'report' => null],
+            ['idarchive' => 7, 'name' => 'done' . $segmentHash2, 'idsite' => 1, 'date1' => '2018-02-02', 'date2' => '2018-03-04', 'period' => Range::PERIOD_ID, 'report' => null],
+            ['idarchive' => 8, 'name' => 'done', 'idsite' => 1, 'date1' => '2018-03-04', 'date2' => '2018-03-04', 'period' => Day::PERIOD_ID, 'report' => null],
+            ['idarchive' => 9, 'name' => 'done', 'idsite' => 1, 'date1' => '2018-03-01', 'date2' => '2018-03-03', 'period' => Range::PERIOD_ID, 'report' => null],
         ];
         shuffle($invalidations);
 
@@ -646,60 +688,94 @@ class QueueConsumerTest extends IntegrationTestCase
         }
 
         $expectedInvalidationsFound = [
-            array (
-                    array (
-                        'idarchive' => '1',
-                        'idsite' => '1',
-                        'date1' => '2018-03-04',
-                        'date2' => '2018-03-04',
-                        'period' => '1',
-                        'name' => 'done',
-                        'report' => null,
-                        'plugin' => null,
-                        'segment' => '',
-                        'ts_started' => null,
-                        'status' => '0',
-                    ),
-                    array (
-                        'idarchive' => '1',
-                        'idsite' => '1',
-                        'date1' => '2018-03-03',
-                        'date2' => '2018-03-03',
-                        'period' => '1',
-                        'name' => 'done5f4f9bafeda3443c3c2d4b2ef4dffadc',
-                        'report' => null,
-                        'plugin' => null,
-                        'segment' => 'browserCode==IE',
-                        'ts_started' => null,
-                        'status' => '0',
-                    ),
-            ),
-            array (
-                0 =>
-                    array (
-                        'idarchive' => '1',
-                        'idsite' => '1',
-                        'date1' => '2018-03-01',
-                        'date2' => '2018-03-31',
-                        'period' => '3',
-                        'name' => 'done5f4f9bafeda3443c3c2d4b2ef4dffadc',
-                        'report' => null,
-                        'plugin' => null,
-                        'segment' => 'browserCode==IE',
-                        'ts_started' => null,
-                        'status' => '0',
-                    ),
-            ),
-            array (// end of idsite=1
-            ),
+            [
+                [
+                    'idarchive' => '8',
+                    'idsite' => '1',
+                    'date1' => '2018-03-04',
+                    'date2' => '2018-03-04',
+                    'period' => '1',
+                    'name' => 'done',
+                    'report' => null,
+                    'plugin' => null,
+                    'segment' => '',
+                    'ts_started' => null,
+                    'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
+                ],
+                [
+                    'idarchive' => '3',
+                    'idsite' => '1',
+                    'date1' => '2018-03-03',
+                    'date2' => '2018-03-03',
+                    'period' => '1',
+                    'name' => 'done5f4f9bafeda3443c3c2d4b2ef4dffadc',
+                    'report' => null,
+                    'plugin' => null,
+                    'segment' => 'browserCode==IE',
+                    'ts_started' => null,
+                    'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
+                ],
+            ],
+            [
+                [
+                    'idarchive' => '5',
+                    'idsite' => '1',
+                    'date1' => '2018-03-01',
+                    'date2' => '2018-03-31',
+                    'period' => '3',
+                    'name' => 'done5f4f9bafeda3443c3c2d4b2ef4dffadc',
+                    'report' => null,
+                    'plugin' => null,
+                    'segment' => 'browserCode==IE',
+                    'ts_started' => null,
+                    'status' => '0',
+                    'processing_host' => null,
+                    'process_id' => null,
+                ],
+            ],
+            [
+                [
+                    'idarchive' => '9',
+                    'name' => 'done',
+                    'idsite' => '1',
+                    'date1' => '2018-03-01',
+                    'date2' => '2018-03-03',
+                    'period' => '5',
+                    'ts_started' => null,
+                    'status' => '0',
+                    'report' => null,
+                    'plugin' => null,
+                    'segment' => '',
+                    'processing_host' => null,
+                    'process_id' => null,
+                ],
+            ],
+            [
+                [
+                    'idarchive' => '7',
+                    'name' => 'done3736b708e4d20cfc10610e816a1b2341',
+                    'idsite' => '1',
+                    'date1' => '2018-02-02',
+                    'date2' => '2018-03-04',
+                    'period' => '5',
+                    'ts_started' => null,
+                    'status' => '0',
+                    'report' => null,
+                    'plugin' => null,
+                    'segment' => 'browserCode==FF',
+                    'processing_host' => null,
+                    'process_id' => null,
+                ],
+            ],
+            [// end of idsite=1
+            ],
         ];
 
-        try {
-            $this->assertEquals($expectedInvalidationsFound, $iteratedInvalidations);
-        } catch (\Exception $ex) {
-            print "\nInvalidations inserted:\n" . var_export($invalidations, true) . "\n";
-            throw $ex;
-        }
+        $this->assertEquals($expectedInvalidationsFound, $iteratedInvalidations);
 
         // automated check for no duplicates
         $invalidationDescs = [];
@@ -712,6 +788,69 @@ class QueueConsumerTest extends IntegrationTestCase
         $uniqueInvalidationDescs = array_unique($invalidationDescs);
 
         $this->assertEquals($uniqueInvalidationDescs, $invalidationDescs, "Found duplicate archives being processed.");
+    }
+
+    /**
+     * @dataProvider getAllPeriods
+     */
+    public function testSkipSegmentsTodayShouldSkipAllSegmentInvalidationsIfPeriodBeginsToday(string $periodType)
+    {
+        if ($periodType === 'range') {
+            $period = Factory::build($periodType, '2018-03-04,2018-04-03');
+        } else {
+            $period = Factory::build($periodType, '2018-03-04');
+        }
+
+        Date::$now = strtotime($period->getDateStart()->toString() . ' 01:00:00');
+
+        Fixture::createWebsite('2015-02-03');
+
+        Rules::setBrowserTriggerArchiving(false);
+        API::getInstance()->add('testegment', 'browserCode==IE', false, true);
+        Rules::setBrowserTriggerArchiving(true);
+
+        // force archiving so we don't skip those without visits
+        Piwik::addAction('Archiving.getIdSitesToArchiveWhenNoVisits', function (&$idSites) {
+            $idSites[] = 1;
+        });
+
+        $cronArchive = new MockCronArchive();
+        $cronArchive->init();
+
+        $archiveFilter = $this->makeTestArchiveFilter(null, null, null, false, true);
+
+        $queueConsumer = new QueueConsumer(
+            StaticContainer::get(LoggerInterface::class),
+            new FixedSiteIds([1]),
+            3,
+            24,
+            new Model(),
+            new SegmentArchiving(),
+            $cronArchive,
+            new RequestParser(true),
+            $archiveFilter
+        );
+
+        $segmentHash1 = (new Segment('browserCode==IE', [1]))->getHash();
+
+        $invalidations = [
+            ['idarchive' => 1, 'name' => 'done' . $segmentHash1, 'idsite' => 1, 'date1' => $period->getDateStart()->toString(), 'date2' => $period->getDateEnd()->toString(), 'period' => $period::PERIOD_ID, 'report' => null],
+        ];
+
+        $this->insertInvalidations($invalidations);
+
+        self::assertEmpty($queueConsumer->getNextArchivesToProcess());
+    }
+
+    public function getAllPeriods()
+    {
+        return [
+            ['day'],
+            ['week'],
+            ['month'],
+            ['year'],
+            ['range'],
+        ];
     }
 
     public function testMaxWebsitesToProcess()
@@ -791,6 +930,8 @@ class QueueConsumerTest extends IntegrationTestCase
                     'report' => null,
                     'plugin' => null,
                     'segment' => '',
+                    'processing_host' => null,
+                    'process_id' => null,
                 ],
             ]
         ];
