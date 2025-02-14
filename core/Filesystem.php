@@ -218,7 +218,7 @@ class Filesystem
      * @param \Closure|false $beforeUnlink An optional closure to execute on a file path before unlinking.
      * @api
      */
-    public static function unlinkRecursive($dir, $deleteRootToo, \Closure $beforeUnlink = null)
+    public static function unlinkRecursive($dir, $deleteRootToo, ?\Closure $beforeUnlink = null)
     {
         if (!$dh = @opendir($dir)) {
             return;
@@ -582,6 +582,33 @@ class Filesystem
             return true;
         }
         return false;
+    }
+
+    /**
+     * Removes characters from filenames that could cause problems.
+     *
+     * This is not intended as a security measure per se, but to avoid
+     * some known problems, e.g. Excel not allowing to open an export
+     * file if some special whitespace/dash characters are present.
+     */
+    public static function sanitizeFilename(string $filename): string
+    {
+        $filename = trim($filename);
+
+        // replace reserved characters
+        // https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file
+        $filename = preg_replace('~[<>:"/\\\\|?*]~', '', $filename);
+
+        // replace special characters
+        // https://www.php.net/manual/it/regexp.reference.unicode.php
+        // - Cc: Control characters
+        // - Zs: Space separators
+        // - Pd: Dash punctuation
+        $filename = preg_replace('~\p{Cc}~u', '', $filename);
+        $filename = preg_replace('~\p{Zs}~u', ' ', $filename);
+        $filename = preg_replace('~\p{Pd}~u', '-', $filename);
+
+        return trim($filename);
     }
 
     /**

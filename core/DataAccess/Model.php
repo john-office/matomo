@@ -36,7 +36,7 @@ class Model
      */
     private $logger;
 
-    public function __construct(LoggerInterface $logger = null)
+    public function __construct(?LoggerInterface $logger = null)
     {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
     }
@@ -113,7 +113,7 @@ class Model
         $archiveTable,
         $idSites,
         $allPeriodsToInvalidate,
-        Segment $segment = null,
+        ?Segment $segment = null,
         bool $forceInvalidateNonexistentRanges = false,
         ?string $name = null,
         bool $doNotCreateInvalidations = false
@@ -163,13 +163,22 @@ class Model
             }
         }
 
+        $doneFlag = Rules::getDoneFlagArchiveContainsAllPlugins($segment ?: new Segment('', []));
+
         if (empty($plugin)) {
-            $doneFlag = Rules::getDoneFlagArchiveContainsAllPlugins($segment ?: new Segment('', []));
+            if (null === $segment) {
+                $nameCondition = "name LIKE '$doneFlag%'"; // invalidate all segments
+            } else {
+                $nameCondition = "(name = '$doneFlag' OR name LIKE '$doneFlag.%')"; // invalidate specific segment only
+            }
         } else {
-            $doneFlag = Rules::getDoneFlagArchiveContainsOnePlugin($segment ?: new Segment('', []), $plugin);
+            if (null === $segment) {
+                $nameCondition = "name LIKE '$doneFlag%.$plugin'"; // invalidate all segments for specific plugin
+            } else {
+                $nameCondition = "name = '$doneFlag.$plugin'"; // invalidate specific segment for specific plugin only
+            }
         }
 
-        $nameCondition = "name LIKE '$doneFlag%'";
 
         $sql .= " AND $nameCondition";
 
@@ -187,7 +196,7 @@ class Model
 
                 // set status to DONE_INVALIDATED for finished archives
                 $sql = "UPDATE `$archiveTable` SET `value` = " . ArchiveWriter::DONE_INVALIDATED . " WHERE idarchive IN ("
-                    . implode(',', $idArchives) . ") AND value != " . ArchiveWriter::DONE_ERROR . " AND $nameCondition";
+                    . implode(',', $idArchives) . ") AND value NOT IN (" . ArchiveWriter::DONE_ERROR . ", " . ArchiveWriter::DONE_ERROR_INVALIDATED . ") AND $nameCondition";
 
                 Db::query($sql);
 
@@ -199,7 +208,7 @@ class Model
             }
         }
 
-        if (true === $doNotCreateInvalidations) {
+        if ($doNotCreateInvalidations) {
             return count($idArchives);
         }
 
@@ -218,6 +227,13 @@ class Model
         $hashesOfAllSegmentsToArchiveInCoreArchive = array_map(function ($definition) {
             return Segment::getSegmentHash($definition);
         }, $hashesOfAllSegmentsToArchiveInCoreArchive);
+
+
+        if (empty($plugin)) {
+            $doneFlag = Rules::getDoneFlagArchiveContainsAllPlugins($segment ?: new Segment('', []));
+        } else {
+            $doneFlag = Rules::getDoneFlagArchiveContainsOnePlugin($segment ?: new Segment('', []), $plugin);
+        }
 
         $dummyArchives = [];
         foreach ($idSites as $idSite) {
@@ -321,10 +337,9 @@ class Model
      * @param int[] $idSites
      * @param string[][] $datesByPeriodType
      * @param Segment $segment
-     * @return \Zend_Db_Statement
      * @throws Exception
      */
-    public function updateRangeArchiveAsInvalidated($archiveTable, $idSites, $allPeriodsToInvalidate, Segment $segment = null)
+    public function updateRangeArchiveAsInvalidated($archiveTable, $idSites, $allPeriodsToInvalidate, ?Segment $segment = null): void
     {
         if (empty($idSites)) {
             return;
@@ -347,18 +362,36 @@ class Model
             }
         }
 
-        if ($segment) {
-            $nameCondition = "name LIKE '" . Rules::getDoneFlagArchiveContainsAllPlugins($segment) . "%'";
-        } else {
+        if (null === $segment) {
             $nameCondition = "name LIKE 'done%'";
+        } else {
+            $doneFlag = Rules::getDoneFlagArchiveContainsAllPlugins($segment);
+            $nameCondition = "(name = '$doneFlag' OR name LIKE '$doneFlag.%')";
         }
 
-        $sql = "UPDATE $archiveTable SET value = " . ArchiveWriter::DONE_INVALIDATED
+        $sql = "SELECT idarchive FROM $archiveTable "
              . " WHERE $nameCondition
                    AND idsite IN (" . implode(", ", $idSites) . ")
                    AND (" . implode(" OR ", $periodConditions) . ")";
 
-        return Db::query($sql, $bind);
+        $recordsToUpdate = Db::fetchAll($sql, $bind);
+
+        if (empty($recordsToUpdate)) {
+            return;
+        }
+
+        $idArchives = array_map('intval', array_column($recordsToUpdate, 'idarchive'));
+
+        $updateSql = "UPDATE $archiveTable SET value = " . ArchiveWriter::DONE_INVALIDATED
+            . " WHERE idarchive IN (" . implode(', ', $idArchives) . ") AND $nameCondition"
+            . " AND value NOT IN (" . ArchiveWriter::DONE_ERROR . ", " . ArchiveWriter::DONE_ERROR_INVALIDATED . ")";
+
+        Db::query($updateSql);
+
+        $updateSql = "UPDATE $archiveTable SET value = " . ArchiveWriter::DONE_ERROR_INVALIDATED
+                   . " WHERE idarchive IN (" . implode(', ', $idArchives) . ") AND $nameCondition AND value = " . ArchiveWriter::DONE_ERROR;
+
+        Db::query($updateSql);
     }
 
     public function getTemporaryArchivesOlderThan($archiveTable, $purgeArchivesOlderThan)
@@ -713,54 +746,16 @@ class Model
         $table = Common::prefixTable('archive_invalidations');
 
         // set archive value to in progress if not set already
-        $statement = Db::query("UPDATE `$table` SET `status` = ?, ts_started = NOW() WHERE idinvalidation = ? AND status = ?", [
+        $statement = Db::query("UPDATE `$table` SET `status` = ?, `processing_host` = ?, `process_id` = ?, `ts_started` = NOW() WHERE `idinvalidation` = ? AND `status` = ?", [
             ArchiveInvalidator::INVALIDATION_STATUS_IN_PROGRESS,
+            gethostname() ?: null,
+            Common::getProcessId(),
             $invalidation['idinvalidation'],
             ArchiveInvalidator::INVALIDATION_STATUS_QUEUED,
         ]);
 
-        if ($statement->rowCount() > 0) { // if we updated, then we've marked the archive as started
-            return true;
-        }
-
-        // archive was not originally started or was started within the expected time, so we assume it's ongoing and another process
-        // (on this machine or another) is actively archiving it.
-        $archiveFailureRecoveryTimeout = GeneralConfig::getConfigValue('archive_failure_recovery_timeout', $invalidation['idsite']);
-        if (
-            empty($invalidation['ts_started'])
-            || $invalidation['ts_started'] > Date::now()->subSeconds($archiveFailureRecoveryTimeout)->getTimestamp()
-        ) {
-            return false;
-        }
-
-        // archive was started over 24 hours ago, we assume it failed and take it over
-        Db::query("UPDATE `$table` SET `status` = ?, ts_started = NOW() WHERE idinvalidation = ?", [
-            ArchiveInvalidator::INVALIDATION_STATUS_IN_PROGRESS,
-            $invalidation['idinvalidation'],
-        ]);
-
-        // remove similar invalidations w/ lesser idinvalidation values
-        $bind = [
-            $invalidation['idsite'],
-            $invalidation['period'],
-            $invalidation['date1'],
-            $invalidation['date2'],
-            $invalidation['name'],
-            ArchiveInvalidator::INVALIDATION_STATUS_IN_PROGRESS,
-        ];
-
-        if (empty($invalidation['report'])) {
-            $reportClause = "(report IS NULL OR report = '')";
-        } else {
-            $reportClause = "report = ?";
-            $bind[] = $invalidation['report'];
-        }
-
-        $sql = "DELETE FROM " . Common::prefixTable('archive_invalidations') . " WHERE idinvalidation < ? AND idsite = ? AND "
-            . "date1 = ? AND date2 = ? AND `period` = ? AND `name` = ? AND $reportClause";
-        Db::query($sql, $bind);
-
-        return true;
+        // if we updated, then we've marked the archive as started
+        return $statement->rowCount() > 0;
     }
 
     public function isSimilarArchiveInProgress($invalidation)
@@ -947,11 +942,12 @@ class Model
     public function hasInvalidationForPeriodAndName($idSite, Period $period, $doneFlag, $report = null)
     {
         $table = Common::prefixTable('archive_invalidations');
+        $report = (!empty($report) && !is_array($report)) ? [$report] : $report;
 
         if (empty($report)) {
             $sql = "SELECT idinvalidation FROM `$table` WHERE idsite = ? AND date1 = ? AND date2 = ? AND `period` = ? AND `name` = ?  AND `report` IS NULL LIMIT 1";
         } else {
-            $sql = "SELECT idinvalidation FROM `$table` WHERE idsite = ? AND date1 = ? AND date2 = ? AND `period` = ? AND `name` = ? AND `report` = ? LIMIT 1";
+            $sql = "SELECT idinvalidation FROM `$table` WHERE idsite = ? AND date1 = ? AND date2 = ? AND `period` = ? AND `name` = ? AND `report` IN (" . Common::getSqlStringFieldsArray($report) . ") LIMIT 1";
         }
 
         $bind = [
@@ -963,7 +959,7 @@ class Model
         ];
 
         if (!empty($report)) {
-            $bind[] = $report;
+            $bind = array_merge($bind, $report);
         }
 
         $idInvalidation = Db::fetchOne($sql, $bind);
@@ -1009,7 +1005,7 @@ class Model
     public function releaseInProgressInvalidation($idinvalidation)
     {
         $table = Common::prefixTable('archive_invalidations');
-        $sql = "UPDATE $table SET status = " . ArchiveInvalidator::INVALIDATION_STATUS_QUEUED . ", ts_started = NULL WHERE idinvalidation = ?";
+        $sql = "UPDATE $table SET status = " . ArchiveInvalidator::INVALIDATION_STATUS_QUEUED . ", ts_started = NULL, processing_host = NULL, process_id = NULL WHERE idinvalidation = ?";
         Db::query($sql, [$idinvalidation]);
     }
 

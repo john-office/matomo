@@ -13,6 +13,7 @@ use Piwik\Common;
 use Piwik\DataTable\Renderer;
 use Piwik\DataTable\Simple;
 use Piwik\DataTable;
+use Piwik\Filesystem;
 use Piwik\Period;
 use Piwik\Period\Range;
 use Piwik\Piwik;
@@ -319,6 +320,8 @@ class Csv extends Renderer
                 . ' _ ' . $prettyDate . '.csv';
         }
 
+        $fileName = Filesystem::sanitizeFilename($fileName);
+
         // silent fail otherwise unit tests fail
         Common::sendHeader("Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode($fileName), true);
         ProxyHttp::overrideCacheControlHeaders();
@@ -494,10 +497,16 @@ class Csv extends Renderer
      */
     protected function removeFirstPercentSign($value)
     {
-        $needle = '%';
-        $posPercent = strpos($value ?? '', $needle);
+        // remove all null byte chars from the beginning
+        $value = ltrim($value, "\0");
+
+        while (0 === strpos($value, '%00')) {
+            $value = ltrim(substr($value, 3), "\0");
+        }
+
+        $posPercent = strpos($value ?? '', '%');
         if ($posPercent !== false) {
-            return substr_replace($value, '', $posPercent, strlen($needle));
+            return substr_replace($value, '', $posPercent, 1);
         }
         return $value;
     }

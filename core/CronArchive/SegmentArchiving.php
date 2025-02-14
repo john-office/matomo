@@ -70,10 +70,10 @@ class SegmentArchiving
 
     public function __construct(
         $beginningOfTimeLastNInYears = self::DEFAULT_BEGINNING_OF_TIME_LAST_N_YEARS,
-        Model $segmentEditorModel = null,
-        Cache $segmentListCache = null,
-        Date $now = null,
-        LoggerInterface $logger = null
+        ?Model $segmentEditorModel = null,
+        ?Cache $segmentListCache = null,
+        ?Date $now = null,
+        ?LoggerInterface $logger = null
     ) {
         $this->processNewSegmentsFrom = StaticContainer::get('ini.General.process_new_segments_from');
         $this->beginningOfTimeLastNInYears = $beginningOfTimeLastNInYears;
@@ -94,12 +94,12 @@ class SegmentArchiving
                 continue;
             }
 
-            try {
-                $segmentObj = new Segment($segment['definition'], [$idSite]);
-            } catch (\Exception $ex) {
+            if (!Segment::isAvailable($segment['definition'], [$idSite])) {
                 $this->logger->debug("Could not process segment {$segment['definition']} for site {$idSite}. Segment should not exist for the site, but does.");
                 continue;
             }
+
+            $segmentObj = new Segment($segment['definition'], [$idSite]);
 
             if ($segmentObj->getHash() == $hash) {
                 return $segment;
